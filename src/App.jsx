@@ -1,4 +1,9 @@
-import { BrowserRouter as Routes, Route, useNavigate } from "react-router-dom";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  useNavigate,
+} from "react-router-dom";
 import { useEffect } from "react";
 import { useAuth0 } from "@auth0/auth0-react";
 import Landing from "./pages/Landing";
@@ -23,13 +28,12 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <Routes>
-        {/* Public landing route (if user happens to visit "/") */}
-        <Route path="/" element={<Landing />} />
-
-        {/* Dashboard route (RouteManager) */}
-        <Route path="/dashboard" element={<RouteManager />} />
-      </Routes>
+      <Router>
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/dashboard" element={<RouteManager />} />
+        </Routes>
+      </Router>
     </div>
   );
 };
