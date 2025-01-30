@@ -1,4 +1,3 @@
-```markdown
 # Routopia
 
 A **route optimization** web application that lets users create, save, and visualize routes using the Google Maps API. Users can also generate a PDF version of each route, including a **screenshot of the map**, **number of stops**, **addresses**, and **step-by-step directions**.
@@ -186,4 +185,3 @@ furnished to do so, subject to the following conditions:
 ---
 
 **Enjoy using Routopia!** Feel free to submit issues or pull requests for new features and improvements.
-```
