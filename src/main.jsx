@@ -4,6 +4,7 @@ import "./index.css";
 import App from "./App.jsx";
 import { authConfig } from "../auth0-config.js";
 import { Auth0Provider } from "@auth0/auth0-react";
+import { BrowserRouter as Router } from "react-router-dom";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
