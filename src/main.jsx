@@ -12,7 +12,9 @@ createRoot(document.getElementById("root")).render(
       clientId={authConfig.clientId}
       authorizationParams={{ redirect_uri: authConfig.redirectUri }}
     >
-      <App />
+      <Router>
+        <App />
+      </Router>
     </Auth0Provider>
   </StrictMode>
 );
