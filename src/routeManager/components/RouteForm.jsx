@@ -1,7 +1,6 @@
 import { useState, useRef } from "react";
 import PropTypes from "prop-types";
 import { Autocomplete } from "@react-google-maps/api";
-import { handleSaveRoute } from "../components/hooks/useRouteManager";
 
 const RouteForm = ({ onSave }) => {
   const [routeName, setRouteName] = useState("");
@@ -29,11 +28,12 @@ const RouteForm = ({ onSave }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!routeName || addresses.some((address) => address === "")) {
+    if (!routeName || addresses.some((address) => address.trim() === "")) {
       alert("Please provide a route name and complete all addresses.");
       return;
     }
     onSave(routeName, addresses);
+
     setRouteName("");
     setAddresses([""]);
   };
@@ -51,7 +51,8 @@ const RouteForm = ({ onSave }) => {
           type="text"
           value={routeName}
           onChange={(e) => setRouteName(e.target.value)}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm
+                     focus:border-blue-500 focus:ring-blue-500"
           placeholder="e.g., Work Commute"
           required
         />
@@ -69,7 +70,8 @@ const RouteForm = ({ onSave }) => {
               type="text"
               value={address}
               onChange={(e) => handleAddressChange(index, e.target.value)}
-              className="w-full mt-1 block rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              className="w-full mt-1 block rounded-md border-gray-300 shadow-sm
+                         focus:border-blue-500 focus:ring-blue-500"
               placeholder={`Address ${index + 1}`}
               required
             />
@@ -84,10 +86,8 @@ const RouteForm = ({ onSave }) => {
       >
         + Add Another Address
       </button>
-
       <button
         type="submit"
-        onClick={handleSaveRoute}
         className="w-full bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600"
       >
         Save Route
