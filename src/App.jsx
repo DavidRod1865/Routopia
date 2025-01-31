@@ -1,5 +1,5 @@
 import {
-  BrowserRouter as Router,
+  BrowserRouter as
   Routes,
   Route,
   useNavigate,
@@ -28,12 +28,10 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <Router>
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/dashboard" element={<RouteManager />} />
-        </Routes>
-      </Router>
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/dashboard" element={<RouteManager />} />
+      </Routes>
     </div>
   );
 };
