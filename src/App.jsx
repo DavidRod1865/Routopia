@@ -10,7 +10,7 @@ const App = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
+    if (isAuthenticated) {
       navigate("/dashboard");
     }
   }, [isLoading, isAuthenticated, navigate]);
