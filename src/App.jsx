@@ -1,11 +1,7 @@
-import {
-  BrowserRouter as
-  Routes,
-  Route,
-  useNavigate,
-} from "react-router-dom";
+import { Routes, Route, useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 import { useAuth0 } from "@auth0/auth0-react";
+
 import Landing from "./pages/Landing";
 import RouteManager from "./routeManager/pages/RouteManager";
 
@@ -15,12 +11,9 @@ const App = () => {
 
   useEffect(() => {
     if (!isLoading) {
-      // If not authenticated, prompt login
       if (!isAuthenticated) {
         loginWithRedirect();
-      }
-      // If authenticated, go straight to "/dashboard"
-      else {
+      } else {
         navigate("/dashboard");
       }
     }
