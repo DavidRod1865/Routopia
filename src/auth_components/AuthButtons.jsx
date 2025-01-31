@@ -16,7 +16,7 @@ const AuthButtons = () => {
         </button>
       ) : (
         <button
-          onClick={loginWithRedirect}
+          onClick={() => loginWithRedirect()}
           className="block my-2 py-2 pr-4 pl-3 text-white bg-blue-700 rounded md:m-0 "
         >
           Login

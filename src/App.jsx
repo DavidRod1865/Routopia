@@ -6,18 +6,14 @@ import Landing from "./pages/Landing";
 import RouteManager from "./routeManager/pages/RouteManager";
 
 const App = () => {
-  const { isAuthenticated, loginWithRedirect, isLoading } = useAuth0();
+  const { isAuthenticated, isLoading } = useAuth0();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!isLoading) {
-      if (!isAuthenticated) {
-        loginWithRedirect();
-      } else {
-        navigate("/dashboard");
-      }
+    if (!isLoading && isAuthenticated) {
+      navigate("/dashboard");
     }
-  }, [isLoading, isAuthenticated, loginWithRedirect, navigate]);
+  }, [isLoading, isAuthenticated, navigate]);
 
   return (
     <div className="min-h-screen bg-gray-100">

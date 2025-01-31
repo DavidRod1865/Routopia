@@ -2,6 +2,7 @@ import AuthButtons from "../auth_components/AuthButtons";
 import BG from "../assets/thomas-kinto-map-unsplash.jpg";
 
 const Landing = () => {
+
   return (
     <div className="relative min-h-screen flex flex-col">
       <div
