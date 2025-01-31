@@ -87,7 +87,7 @@ export default function useRouteManager() {
         setIsEmpty(false);
       } else {
         console.error("Unexpected response:", data);
-        window.location.reload();
+        alert("Unexpected response from the server. Please try again.");
       }
     } catch (err) {
       console.error("Error saving route:", err.message);
