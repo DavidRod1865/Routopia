@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import PropTypes from "prop-types";
 import { Autocomplete } from "@react-google-maps/api";
+import { handleSaveRoute } from "../components/hooks/useRouteManager";
 
 const RouteForm = ({ onSave }) => {
   const [routeName, setRouteName] = useState("");
@@ -86,6 +87,7 @@ const RouteForm = ({ onSave }) => {
 
       <button
         type="submit"
+        onClick={handleSaveRoute}
         className="w-full bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600"
       >
         Save Route

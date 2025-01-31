@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
 import { useAuth0 } from "@auth0/auth0-react";
 import { fetchRoutes, saveRoute, deleteRoute } from "../services/routeServices";
+import html2canvas from "html2canvas";
+import { jsPDF } from "jspdf";
 
 export default function useRouteManager() {
   const { user, getIdTokenClaims } = useAuth0();
+  const mapRef = useState(null);
 
   const [routes, setRoutes] = useState([]);
   const [directions, setDirections] = useState(null);
