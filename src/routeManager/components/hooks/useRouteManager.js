@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth0 } from "@auth0/auth0-react";
 import { fetchRoutes, saveRoute, deleteRoute } from "../services/routeServices";
 import html2canvas from "html2canvas";
@@ -6,7 +6,7 @@ import { jsPDF } from "jspdf";
 
 export default function useRouteManager() {
   const { user, getIdTokenClaims } = useAuth0();
-  const mapRef = useState(null);
+  const mapRef = useRef(null);
 
   const [routes, setRoutes] = useState([]);
   const [directions, setDirections] = useState(null);
@@ -71,28 +71,25 @@ export default function useRouteManager() {
       alert("User is not authenticated");
       return;
     }
-
+  
     try {
       const { __raw: token } = await getIdTokenClaims();
-      const { data, error } = await saveRoute(routeName, addresses, user.sub, token);
-
-      if (error) {
-        console.error("Error saving route:", error);
+      const response = await saveRoute(routeName, addresses, user.sub, token);
+  
+      if (!response || response.error) {
+        console.error("Error saving route:", response?.error || "Unknown error");
+        alert("Failed to save the route. Please try again.");
         return;
       }
-
-      if (data) {
-        alert("Route saved successfully!");
-        setRoutes((prevRoutes) => [...prevRoutes, data[0]]);
-        setIsEmpty(false);
-      } else {
-        console.error("Unexpected response:", data);
-        alert("Unexpected response from the server. Please try again.");
-      }
+  
+      alert("Route saved successfully!");
+      setRoutes((prevRoutes) => [...prevRoutes, response.data[0]]);
+      setIsEmpty(false);
     } catch (err) {
-      console.error("Error saving route:", err.message);
+      console.error("Unexpected error:", err.message);
+      alert("An unexpected error occurred. Please check your network and try again.");
     }
-  };
+  };  
 
   const handleDeleteRoute = async (routeId) => {
     const { error } = await deleteRoute(routeId);
