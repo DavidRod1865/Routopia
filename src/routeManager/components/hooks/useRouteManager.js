@@ -82,14 +82,22 @@ export default function useRouteManager() {
         return;
       }
   
+      // Debugging: Log response
+      console.log("Saved Route Response:", response);
+  
       alert("Route saved successfully!");
+  
       setRoutes((prevRoutes) => [...prevRoutes, response.data[0]]);
       setIsEmpty(false);
+  
+      // Ensure the UI updates correctly
+      setSelectedRoute(response.data[0]); 
+  
     } catch (err) {
       console.error("Unexpected error:", err.message);
       alert("An unexpected error occurred. Please check your network and try again.");
     }
-  };  
+  };   
 
   const handleDeleteRoute = async (routeId) => {
     const { error } = await deleteRoute(routeId);
