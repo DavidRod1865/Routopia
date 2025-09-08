@@ -1,5 +1,5 @@
 import PropTypes from "prop-types";
-import AuthButtons from "../../auth_components/AuthButtons";
+import AuthButtons from "../auth_components/AuthButtons";
 
 const Header = ({ user, sidebarOpen, setSidebarOpen }) => {
   return (
@@ -25,7 +25,9 @@ const Header = ({ user, sidebarOpen, setSidebarOpen }) => {
             />
           </svg>
         </button>
-        <h1 className="text-xl font-bold">Routopia</h1>
+        <h1 className="text-2xl font-bold text-black">
+          routopia<span className="text-green-600">+</span>
+        </h1>
       </div>
 
       <div>

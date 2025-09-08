@@ -1,4 +1,4 @@
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useEffect } from "react";
 import PropTypes from "prop-types";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
@@ -13,6 +13,7 @@ function MapSection({
   handleCloseRoute,
 }) {
   const mapDivRef = useRef(null);
+  const mapInstanceRef = useRef(null);
 
   const handleGeneratePDF = useCallback(async () => {
     if (!selectedRoute) {
@@ -91,14 +92,77 @@ function MapSection({
       console.error("Error generating PDF:", err);
       alert("Could not generate PDF. Please try again.");
     }
-  }, [selectedRoute, directions]);  
+  }, [selectedRoute, directions]);
+  
+  // Function to fit map bounds to show entire route
+  const fitMapToRoute = useCallback(() => {
+    if (!mapInstanceRef.current) return;
+
+    try {
+      const map = mapInstanceRef.current;
+      
+      // Option 1: Use directions bounds if available
+      if (directions && directions.routes && directions.routes.length > 0) {
+        const bounds = directions.routes[0].bounds;
+        if (bounds) {
+          map.fitBounds(bounds, { padding: 50 });
+          return;
+        }
+      }
+      
+      // Option 2: Calculate bounds from selected route addresses
+      if (selectedRoute && selectedRoute.addresses && selectedRoute.addresses.length > 0) {
+        const bounds = new window.google.maps.LatLngBounds();
+        
+        const geocoder = new window.google.maps.Geocoder();
+        let geocodePromises = [];
+        
+        selectedRoute.addresses.forEach((address) => {
+          const promise = new Promise((resolve) => {
+            geocoder.geocode({ address }, (results, status) => {
+              if (status === 'OK' && results[0]) {
+                bounds.extend(results[0].geometry.location);
+              }
+              resolve();
+            });
+          });
+          geocodePromises.push(promise);
+        });
+        
+        // Wait for all geocoding to complete, then fit bounds
+        Promise.all(geocodePromises).then(() => {
+          if (!bounds.isEmpty()) {
+            map.fitBounds(bounds, { padding: 50 });
+          }
+        });
+        
+        return;
+      }
+      
+      // Option 3: Fall back to default center and zoom
+      if (center) {
+        map.setCenter(center);
+        map.setZoom(10);
+      }
+    } catch (error) {
+      console.error('Error fitting map to route:', error);
+    }
+  }, [directions, selectedRoute, center]);
+  
+  // Effect to fit bounds when route data changes
+  useEffect(() => {
+    if (mapInstanceRef.current && (selectedRoute || directions)) {
+      fitMapToRoute();
+    }
+  }, [selectedRoute, directions, fitMapToRoute]);
 
   return (
-    <div className="relative flex-1 flex flex-col">
+    <div className="relative flex-1 flex flex-col w-full h-full">
       {/* Top Section (Map) */}
       <div
         ref={mapDivRef}
         className={`
+          w-full
           transition-all 
           duration-300
           ${selectedRoute ? "h-1/2" : "h-full"}
@@ -106,9 +170,17 @@ function MapSection({
       >
         <GoogleMap
           onLoad={(map) => {
+            mapInstanceRef.current = map;
             if (mapRef) {
               mapRef.current = map;
             }
+            // Fit bounds after map loads if we have route data
+            if (selectedRoute || directions) {
+              setTimeout(() => fitMapToRoute(), 100);
+            }
+          }}
+          onError={(error) => {
+            console.error("Google Map error:", error);
           }}
           mapContainerStyle={mapContainerStyle}
           center={center}
