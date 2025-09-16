@@ -110,7 +110,7 @@ const ClientSelector = ({
       {isOpen && !disabled && (
         <div 
           ref={dropdownRef}
-          className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+          className="absolute z-[10000] w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto"
         >
           {loading ? (
             <div className="px-4 py-3 text-gray-500 text-center">

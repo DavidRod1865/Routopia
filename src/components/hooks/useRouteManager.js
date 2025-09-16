@@ -5,11 +5,13 @@ import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import { useToast } from "../../contexts/ToastContext";
 import useUserPermissions from "./useUserPermissions";
+import useUserCreation from "./useUserCreation";
 
 export default function useRouteManager() {
   const { user, getIdTokenClaims } = useAuth0();
   const { showSuccess, showError } = useToast();
   const { can, getDataScope, permissions } = useUserPermissions();
+  const { userRecord, isCreating } = useUserCreation();
   const mapRef = useRef(null);
 
   const [routes, setRoutes] = useState([]);
@@ -21,88 +23,61 @@ export default function useRouteManager() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [center, setCenter] = useState({ lat: 40.7128, lng: -74.006 }); // Default to NYC, will update based on route
 
-  const getOrganizationId = async (supabase) => {
-    const { data, error } = await supabase
-      .from('users')
-      .select('organization_id')
-      .eq('auth0_id', user.sub)
-      .single();
-
-    if (error) {
-      if (error.code === 'PGRST116') {
-        throw new Error("Organization not found. Please contact support.");
-      }
-      throw new Error(`Error fetching organization: ${error.message}`);
-    }
-
-    return data.organization_id;
-  };
+  // Legacy function - now using userRecord.organization_id directly
 
   // --------------------
   // Fetch routes on mount
   // --------------------
   useEffect(() => {
-    if (user && user.sub) {
-      const loadRoutes = async () => {
-        setFetching(true);
-        setFetchError(null);
+    if (!user?.sub || isCreating || !userRecord) {
+      // Wait for user creation to complete
+      setFetching(isCreating);
+      return;
+    }
 
-        try {
-          const tokenClaims = await getIdTokenClaims();
-          if (!tokenClaims || !tokenClaims.__raw) {
-            throw new Error("Unable to get authentication token");
-          }
+    const loadRoutes = async () => {
+      setFetching(true);
+      setFetchError(null);
 
-          const supabase = getSupabaseClient(tokenClaims.__raw);
-          
-          // Get organization UUID from users table
-          const organizationId = await getOrganizationId(supabase);
-
-          // Get data scope based on user role
-          const dataScope = getDataScope.routes();
-          
-          let query = supabase
-            .from("routes")
-            .select("*");
-          
-          // Apply role-based filtering
-          Object.entries(dataScope).forEach(([key, value]) => {
-            query = query.eq(key, value);
-          });
-          
-          const { data, error } = await query;
-          if (error) {
-            console.error("Error fetching routes:", error);
-            setFetchError(error);
-            setIsEmpty(false);
-          } else {
-            if (!data || data.length === 0) {
-              setIsEmpty(true);
-              setRoutes([]);
-            } else {
-              setIsEmpty(false);
-              setRoutes(data);
-            }
-          }
-        } catch (err) {
-          console.error("Fetching error:", err);
-          setFetchError(err.message || "Failed to load routes");
-          setIsEmpty(false);
+      try {
+        const tokenClaims = await getIdTokenClaims();
+        if (!tokenClaims || !tokenClaims.__raw) {
+          throw new Error("Unable to get authentication token");
         }
 
-        setFetching(false);
-      };
+        const supabase = getSupabaseClient(tokenClaims.__raw);
+        
+        // Query routes for this user's organization
+        const { data, error } = await supabase
+          .from("routes")
+          .select("*")
+          .eq('organization_id', userRecord.organization_id)
+          .order('created_at', { ascending: false });
 
-      loadRoutes();
-    } else if (!user) {
-      // User not loaded yet, keep in loading state
-      setFetching(true);
-    } else {
-      // User is loaded but has no sub, this shouldn't happen but handle gracefully
-      setFetchError("Authentication error: Invalid user data");
+        if (error) {
+          console.error("Error fetching routes:", error);
+          setFetchError(error.message);
+          setIsEmpty(false);
+        } else {
+          if (!data || data.length === 0) {
+            setIsEmpty(true);
+            setRoutes([]);
+          } else {
+            setIsEmpty(false);
+            setRoutes(data);
+          }
+        }
+      } catch (err) {
+        console.error("Fetching error:", err);
+        setFetchError(err.message || "Failed to load routes");
+        setIsEmpty(false);
+      }
+
       setFetching(false);
-    }
-  }, [user?.sub]); // Only depend on user.sub to prevent infinite loops
+    };
+
+    loadRoutes();
+  }, [user?.sub, userRecord, isCreating]);
 
   // -------------------------
   // Helper Functions
@@ -149,8 +124,8 @@ export default function useRouteManager() {
   };
 
   const handleSaveRoute = async (routeName, addresses) => {
-    if (!user) {
-      showError("User is not authenticated");
+    if (!user || !userRecord) {
+      showError("User is not authenticated or not set up");
       return;
     }
   
@@ -161,18 +136,21 @@ export default function useRouteManager() {
       }
 
       const supabase = getSupabaseClient(tokenClaims.__raw);
-      
-      // Get organization UUID from users table
-      const organizationId = await getOrganizationId(supabase);
+
+      // Create route with correct schema fields
+      const routeData = {
+        name: routeName, // Schema uses 'name' not 'route_name'
+        organization_id: userRecord.organization_id,
+        created_by_user_id: userRecord.id, // Schema uses 'created_by_user_id' not 'user_id'
+        status: 'not_started', // Default status
+        route_data: { addresses }, // Store addresses in route_data JSONB field
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
 
       const { data, error } = await supabase
         .from("routes")
-        .insert([{ 
-          organization_id: organizationId, 
-          user_id: user.sub,
-          route_name: routeName, 
-          addresses 
-        }])
+        .insert([routeData])
         .select()
         .single();
 
@@ -184,11 +162,14 @@ export default function useRouteManager() {
   
       showSuccess("Route saved successfully!");
   
-      setRoutes((prevRoutes) => [...prevRoutes, data]);
+      // Add to local state
+      setRoutes((prevRoutes) => [data, ...prevRoutes]);
       setIsEmpty(false);
   
-      // Ensure the UI updates correctly
+      // Set as selected route
       setSelectedRoute(data); 
+  
+      return data;
   
     } catch (err) {
       console.error("Unexpected error:", err.message);
@@ -197,7 +178,7 @@ export default function useRouteManager() {
   };   
 
   const handleDeleteRoute = async (routeId) => {
-    if (!user) {
+    if (!user || !userRecord) {
       showError("User is not authenticated");
       return;
     }
@@ -232,6 +213,12 @@ export default function useRouteManager() {
         const updatedRoutes = routes.filter((route) => route.id !== routeId);
         setRoutes(updatedRoutes);
         if (updatedRoutes.length === 0) setIsEmpty(true);
+        
+        // Clear selected route if it was deleted
+        if (selectedRoute?.id === routeId) {
+          setSelectedRoute(null);
+          setDirections(null);
+        }
       }
     } catch (err) {
       console.error("Unexpected error:", err.message);
@@ -240,7 +227,7 @@ export default function useRouteManager() {
   };
 
   const handleUpdateRoute = async (routeId, newAddresses) => {
-    if (!user) {
+    if (!user || !userRecord) {
       showError("User is not authenticated");
       return;
     }
@@ -252,9 +239,14 @@ export default function useRouteManager() {
       }
 
       const supabase = getSupabaseClient(tokenClaims.__raw);
+      
+      // Update with correct schema field
       const { data, error } = await supabase
         .from("routes")
-        .update({ addresses: newAddresses })
+        .update({ 
+          route_data: { addresses: newAddresses },
+          updated_at: new Date().toISOString()
+        })
         .eq("id", routeId)
         .select()
         .single();
@@ -287,7 +279,8 @@ export default function useRouteManager() {
   };
 
   const viewRoute = async (route) => {
-    const addresses = route.addresses;
+    // Extract addresses from route_data JSONB field
+    const addresses = route.route_data?.addresses || route.addresses || [];
     if (addresses.length < 2) {
       showError("At least two addresses are needed to display a route.");
       return;
@@ -357,10 +350,10 @@ export default function useRouteManager() {
       pdf.setFontSize(12);
       pdf.text("Route Addresses:", 20, 240);
 
-      // Suppose you have an array of addresses:
-      // selectedRoute.addresses.forEach((address, idx) => ...)
+      // Get addresses from route_data
+      const addresses = selectedRoute.route_data?.addresses || selectedRoute.addresses || [];
       let yPos = 260;
-      selectedRoute.addresses.forEach((addr, idx) => {
+      addresses.forEach((addr, idx) => {
         pdf.text(`${idx + 1}. ${addr}`, 20, yPos);
         yPos += 20; // move down for each address
       });

@@ -3,42 +3,40 @@ import { useAuth0 } from "@auth0/auth0-react";
 import { getSupabaseClient } from "./useSupabaseClient";
 import { useToast } from "../../contexts/ToastContext";
 import useUserPermissions from "./useUserPermissions";
+import useUserCreation from "./useUserCreation";
 
 export default function useClientManager() {
   const { user, getIdTokenClaims } = useAuth0();
   const { showError } = useToast();
   const { can, getDataScope, permissions } = useUserPermissions();
+  const { userRecord } = useUserCreation();
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
-  const getOrganizationId = async (supabase) => {
-    const { data, error } = await supabase
-      .from('users')
-      .select('organization_id')
-      .eq('auth0_id', user.sub)
-      .single();
+  // Filter clients based on search term
+  const filteredClients = clients.filter(client =>
+    client.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    client.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    client.address?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-    if (error) {
-      console.error('Error fetching organization ID:', error);
-      throw new Error(error.message);
-    }
-    return data.organization_id;
-  };
+  // Use userRecord.organization_id directly instead of fetching
 
   // Fetch clients on mount
   useEffect(() => {
-    if (user && user.sub) {
+    if (user && user.sub && userRecord) {
       fetchClients();
     }
-  }, [user?.sub]);
+  }, [user?.sub, userRecord]);
 
   /**
    * Fetch all clients for the current user's organization
    */
   const fetchClients = async () => {
-    if (!user) {
-      setError("User is not authenticated");
+    if (!user || !userRecord) {
+      setError("User is not authenticated or not set up");
       return;
     }
 
@@ -53,19 +51,19 @@ export default function useClientManager() {
 
       const supabase = getSupabaseClient(tokenClaims.__raw);
 
-      // Get organization UUID from organizations table
-      const organizationId = await getOrganizationId(supabase);
-
-      // Get data scope based on user role
+      // Get data scope based on user role - ensure organization filtering
       const dataScope = getDataScope.clients();
       
       let query = supabase
         .from('clients')
-        .select('*');
+        .select('*')
+        .eq('organization_id', userRecord.organization_id);
       
-      // Apply role-based filtering
+      // Apply additional role-based filtering
       Object.entries(dataScope).forEach(([key, value]) => {
-        query = query.eq(key, value);
+        if (key !== 'organization_id') { // Skip org filter since we already added it
+          query = query.eq(key, value);
+        }
       });
       
       const { data, error } = await query.order('created_at', { ascending: false });
@@ -90,8 +88,8 @@ export default function useClientManager() {
    * Create a new client
    */
   const handleCreateClient = async (clientData) => {
-    if (!user) {
-      throw new Error("User is not authenticated");
+    if (!user || !userRecord) {
+      throw new Error("User is not authenticated or not set up");
     }
 
     try {
@@ -102,18 +100,15 @@ export default function useClientManager() {
 
       const supabase = getSupabaseClient(tokenClaims.__raw);
 
-      // Get organization UUID from organizations table
-      const organizationId = await getOrganizationId(supabase);
-
       const clientPayload = {
-        ...clientData,
-        organization_id: organizationId,
-        created_by_user_id: user.sub, // Track who created the client
-        notification_preferences: {
-          email: true,
-          sms: false,
-          push: true
-        }
+        name: clientData.name,
+        email: clientData.email,
+        phone: clientData.phone,
+        address: clientData.address,
+        organization_id: userRecord.organization_id,
+        created_by_user_id: userRecord.id,
+        status: clientData.status || 'active',
+        notes: clientData.notes || null,
       };
 
       const { data, error } = await supabase
@@ -140,8 +135,8 @@ export default function useClientManager() {
    * Update an existing client
    */
   const handleUpdateClient = async (clientId, clientData) => {
-    if (!user) {
-      throw new Error("User is not authenticated");
+    if (!user || !userRecord) {
+      throw new Error("User is not authenticated or not set up");
     }
 
     try {
@@ -182,8 +177,8 @@ export default function useClientManager() {
    * Delete a client
    */
   const handleDeleteClient = async (clientId) => {
-    if (!user) {
-      throw new Error("User is not authenticated");
+    if (!user || !userRecord) {
+      throw new Error("User is not authenticated or not set up");
     }
 
     // Find the client to check permissions
@@ -235,10 +230,12 @@ export default function useClientManager() {
 
   return {
     // State
-    clients: clients,
+    clients: filteredClients,
+    allClients: clients,
     loading,
     error,
-    isEmpty: clients.length === 0,
+    isEmpty: filteredClients.length === 0,
+    searchTerm,
     
     // Actions
     fetchClients,
@@ -246,6 +243,7 @@ export default function useClientManager() {
     updateClient: handleUpdateClient,
     deleteClient: handleDeleteClient,
     clearError,
+    setSearchTerm,
     
     // Permission helpers
     canDeleteClient: can.deleteClient,

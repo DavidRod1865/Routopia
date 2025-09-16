@@ -61,7 +61,7 @@ const RouteForm = ({ onSave, onClose }) => {
           </button>
         </div>
         
-        <form onSubmit={handleSubmit} className="p-4 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
           <div>
             <label className="block text-sm font-medium">Route Name</label>
             <input
@@ -75,7 +75,7 @@ const RouteForm = ({ onSave, onClose }) => {
           </div>
 
           {selectedClients.map((client, index) => (
-            <div key={index} className="space-y-2">
+            <div key={index} className="space-y-3 pb-4">
               <div className="flex items-center justify-between">
                 <label className="block text-sm font-medium">
                   Client {index + 1}
@@ -91,35 +91,48 @@ const RouteForm = ({ onSave, onClose }) => {
                 )}
               </div>
               
-              <ClientSelector
-                onClientSelect={(selectedClient) => handleClientSelect(index, selectedClient)}
-                selectedClient={client}
-                placeholder={`Search for client ${index + 1}...`}
-              />
-              
-              {client && (
-                <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded">
-                  <strong>{client.name}</strong><br />
-                  {client.address}
+              {!client ? (
+                <div className="mb-4">
+                  <ClientSelector
+                    onClientSelect={(selectedClient) => handleClientSelect(index, selectedClient)}
+                    selectedClient={client}
+                    placeholder={`Search for client ${index + 1}...`}
+                  />
+                </div>
+              ) : (
+                <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded border relative">
+                  <button
+                    type="button"
+                    onClick={() => handleClientSelect(index, null)}
+                    className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 text-lg"
+                  >
+                    ×
+                  </button>
+                  <div className="font-medium text-gray-900 pr-6">{client.name}</div>
+                  <div className="text-gray-600 pr-6">{client.address}</div>
                 </div>
               )}
             </div>
           ))}
 
-          <button
-            type="button"
-            onClick={handleAddAddress}
-            className="text-blue-500 hover:underline"
-          >
-            + Add Another Client
-          </button>
+          <div className="pt-4 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={handleAddAddress}
+              className="text-blue-500 hover:underline text-sm font-medium"
+            >
+              + Add Another Client
+            </button>
+          </div>
           
-          <button
-            type="submit"
-            className="w-full bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600"
-          >
-            Save Route
-          </button>
+          <div className="pt-2">
+            <button
+              type="submit"
+              className="w-full bg-blue-500 text-white py-3 px-4 rounded-lg hover:bg-blue-600 font-medium"
+            >
+              Save Route
+            </button>
+          </div>
         </form>
       </div>
     </div>,

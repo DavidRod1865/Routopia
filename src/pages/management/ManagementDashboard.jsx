@@ -18,6 +18,7 @@ import AssignmentsPage from "./pages/AssignmentsPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import useRouteManager from "../../components/hooks/useRouteManager";
 import useUserPermissions from "../../components/hooks/useUserPermissions";
+import useUserCreation from "../../components/hooks/useUserCreation";
 import GoogleMapsProvider from "../../providers/GoogleMapsProvider";
 
 function ManagementDashboard() {
@@ -35,7 +36,10 @@ function ManagementDashboard() {
     handleSaveRoute,
   } = useRouteManager();
   
-  const { can, userRole, isAdmin, isManager } = useUserPermissions();
+  const { can, userRole, isAdmin, isUser } = useUserPermissions();
+  
+  // Initialize user creation for new users
+  useUserCreation();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [resetTrigger, setResetTrigger] = useState(0);
@@ -69,7 +73,7 @@ function ManagementDashboard() {
       icon: "👥",
       path: "/dashboard/drivers",
       color: "bg-red-100 text-red-700 border border-red-200",
-      requiresPermission: "drivers.view", // Only admin/manager
+      requiresPermission: "users.view", // Only admins can manage drivers (users with 'user' role)
     },
     {
       id: "assignments",
@@ -77,7 +81,7 @@ function ManagementDashboard() {
       icon: "📋",
       path: "/dashboard/assignments",
       color: "bg-purple-100 text-purple-700 border border-purple-200",
-      requiresPermission: "assignments.viewAll", // Only admin/manager can view all
+      requiresPermission: "assignments.viewAll", // Admins can view all assignments
     },
     {
       id: "analytics",
@@ -85,7 +89,7 @@ function ManagementDashboard() {
       icon: "📊",
       path: "/dashboard/analytics",
       color: "bg-yellow-100 text-yellow-700 border border-yellow-200",
-      requiresPermission: "analytics.viewOrgWide", // Only admin/manager for org-wide analytics
+      requiresPermission: "analytics.viewOrgWide", // Admins get org-wide analytics
     },
   ];
 
@@ -105,17 +109,6 @@ function ManagementDashboard() {
   const handleResetComplete = () => {
     setResetTrigger(0);
   };
-
-  // if (!organization) {
-  //   return (
-  //     <div className="min-h-screen flex items-center justify-center bg-gray-100">
-  //       <div className="text-center">
-  //         <h2 className="text-2xl font-bold text-gray-900 mb-4">No Organization Found</h2>
-  //         <p className="text-gray-600">Please contact support to set up your organization.</p>
-  //       </div>
-  //     </div>
-  //   );
-  // }
 
   return (
     <GoogleMapsProvider>
@@ -145,9 +138,9 @@ function ManagementDashboard() {
                     Administrator
                   </span>
                 )}
-                {isManager && !isAdmin && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 mt-1">
-                    Manager
+                {isUser && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 mt-1">
+                    Driver
                   </span>
                 )}
               </div>

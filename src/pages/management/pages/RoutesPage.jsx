@@ -2,6 +2,67 @@ import { useState, useEffect, useRef } from "react";
 import PropTypes from "prop-types";
 import MapSection from "../../../components/MapSection";
 import RouteForm from "../../../components/RouteForm";
+import RouteDetailPanel from "../../../components/RouteDetailPanel";
+
+// Function to calculate route details using Google Maps
+const calculateRouteDetails = async (addresses) => {
+  if (!addresses || addresses.length < 2) {
+    return { duration: '0 min', distance: '0 mi' };
+  }
+
+  try {
+    const directionsService = new window.google.maps.DirectionsService();
+    
+    const result = await directionsService.route({
+      origin: addresses[0],
+      destination: addresses[addresses.length - 1],
+      waypoints: addresses
+        .slice(1, -1)
+        .map((address) => ({ location: address, stopover: true })),
+      travelMode: window.google.maps.TravelMode.DRIVING,
+      optimizeWaypoints: true,
+    });
+
+    const route = result.routes[0];
+    
+    // Calculate total duration and distance
+    let totalDuration = 0;
+    let totalDistance = 0;
+    
+    route.legs.forEach(leg => {
+      totalDuration += leg.duration.value; // in seconds
+      totalDistance += leg.distance.value; // in meters
+    });
+
+    const drivingMinutes = Math.round(totalDuration / 60);
+    const stopCount = addresses.length;
+    const stopTimeMinutes = stopCount * 30; // 30 minutes per stop
+    const totalMinutes = drivingMinutes + stopTimeMinutes;
+    
+    const distanceMiles = (totalDistance * 0.000621371).toFixed(1);
+
+    // Format duration as hours and minutes
+    const formatDuration = (minutes) => {
+      if (minutes < 60) {
+        return `${minutes} min`;
+      }
+      const hours = Math.floor(minutes / 60);
+      const remainingMinutes = minutes % 60;
+      if (remainingMinutes === 0) {
+        return `${hours}h`;
+      }
+      return `${hours}h ${remainingMinutes}m`;
+    };
+
+    return {
+      duration: formatDuration(totalMinutes),
+      distance: `${distanceMiles} mi`
+    };
+  } catch (error) {
+    console.error('Error calculating route details:', error);
+    return { duration: '-- min', distance: '-- mi' };
+  }
+};
 
 const RoutesPage = ({
   routes,
@@ -19,11 +80,115 @@ const RoutesPage = ({
 }) => {
   const [showModal, setShowModal] = useState(false);
   const [viewMode, setViewMode] = useState('dashboard'); // 'dashboard' | 'route-detail'
+  const [routeDetails, setRouteDetails] = useState({}); // Store calculated route details
   const mapRef = useRef(null);
+
+  // Calculate average duration from route details
+  const calculateAverageDuration = () => {
+    if (!routes || routes.length === 0) return '0 min';
+    
+    let totalMinutes = 0;
+    let validRoutes = 0;
+    
+    routes.forEach(route => {
+      const details = routeDetails[route.id];
+      if (details && details.duration !== 'Calculating...' && details.duration !== '-- min') {
+        // Parse duration string back to minutes for averaging
+        const durationStr = details.duration;
+        let minutes = 0;
+        
+        if (durationStr.includes('h')) {
+          const parts = durationStr.split('h');
+          const hours = parseInt(parts[0]);
+          minutes += hours * 60;
+          
+          if (parts[1] && parts[1].includes('m')) {
+            const mins = parseInt(parts[1].replace('m', '').trim());
+            minutes += mins;
+          }
+        } else if (durationStr.includes('min')) {
+          minutes = parseInt(durationStr.replace('min', '').trim());
+        }
+        
+        if (minutes > 0) {
+          totalMinutes += minutes;
+          validRoutes++;
+        }
+      }
+    });
+    
+    if (validRoutes === 0) return 'Calculating...';
+    
+    const avgMinutes = Math.round(totalMinutes / validRoutes);
+    
+    // Format average duration
+    if (avgMinutes < 60) {
+      return `${avgMinutes} min`;
+    }
+    const hours = Math.floor(avgMinutes / 60);
+    const remainingMinutes = avgMinutes % 60;
+    if (remainingMinutes === 0) {
+      return `${hours}h`;
+    }
+    return `${hours}h ${remainingMinutes}m`;
+  };
+
+  // Calculate route details when routes change
+  useEffect(() => {
+    const calculateAllRouteDetails = async () => {
+      if (!routes || routes.length === 0) return;
+      
+      const details = {};
+      for (const route of routes) {
+        const addresses = route.route_data?.addresses;
+        if (addresses && addresses.length >= 2) {
+          try {
+            const routeCalc = await calculateRouteDetails(addresses);
+            details[route.id] = routeCalc;
+          } catch (error) {
+            console.error(`Error calculating details for route ${route.id}:`, error);
+            details[route.id] = { duration: '-- min', distance: '-- mi' };
+          }
+        } else {
+          details[route.id] = { duration: '0 min', distance: '0 mi' };
+        }
+      }
+      setRouteDetails(details);
+    };
+
+    if (window.google && window.google.maps) {
+      calculateAllRouteDetails();
+    }
+  }, [routes]);
 
   const handleRouteSelect = (route) => {
     viewRoute(route);
     setViewMode('route-detail');
+  };
+
+  // Route management handlers
+  const handleEditRoute = (routeId) => {
+    // TODO: Implement route editing functionality
+    console.log('Edit route:', routeId);
+  };
+
+  const handleDeleteRoute = async (routeId) => {
+    if (window.confirm('Are you sure you want to delete this route?')) {
+      // TODO: Implement route deletion
+      console.log('Delete route:', routeId);
+      // For now, just close the panel
+      handleCloseRoute();
+    }
+  };
+
+  const handleDuplicateRoute = (routeId) => {
+    // TODO: Implement route duplication
+    console.log('Duplicate route:', routeId);
+  };
+
+  const handleStartRoute = (routeId) => {
+    // TODO: Implement navigation start
+    console.log('Start navigation for route:', routeId);
   };
 
   // Reset to dashboard mode when resetTrigger changes (Routes button clicked)
@@ -186,7 +351,7 @@ const RoutesPage = ({
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-600">Total Stops</p>
                     <p className="text-2xl font-bold text-gray-900">
-                      {routes.reduce((total, route) => total + (route.addresses?.length || 0), 0)}
+                      {routes.reduce((total, route) => total + (route.route_data?.addresses?.length || 0), 0)}
                     </p>
                   </div>
                 </div>
@@ -201,7 +366,7 @@ const RoutesPage = ({
                   </div>
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-600">Avg Duration</p>
-                    <p className="text-2xl font-bold text-gray-900">25 min</p>
+                    <p className="text-2xl font-bold text-gray-900">{calculateAverageDuration()}</p>
                   </div>
                 </div>
               </div>
@@ -242,17 +407,16 @@ const RoutesPage = ({
                     <div className="flex justify-between items-center">
                       <div className="flex items-center space-x-2 text-gray-600">
                         <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-                        <span className="text-sm">{route.addresses?.length || 0} stops</span>
+                        <span className="text-sm">{route.route_data?.addresses?.length || 0} stops</span>
                       </div>
                       <div className="flex items-center space-x-2 text-gray-600">
                         <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                        <span className="text-sm">~15 min</span>
+                        <span className="text-sm">{routeDetails[route.id]?.duration || 'Calculating...'}</span>
                       </div>
                     </div>
                     
                     <div className="flex justify-between items-center text-sm text-gray-500">
-                      <span>Distance: ~12.5 mi</span>
-                      <span>ETA: 25 min</span>
+                      <span>Distance: {routeDetails[route.id]?.distance || 'Calculating...'}</span>
                     </div>
                     
                     {/* Progress Bar */}
@@ -283,7 +447,7 @@ const RoutesPage = ({
   // Route Detail View
   return (
     <>
-      {/* Map Container with Enhanced UI */}
+      {/* Map Container with Summary Overlay */}
       <div className="relative h-full w-full">
         <MapSection
           selectedRoute={selectedRoute}
@@ -294,105 +458,49 @@ const RoutesPage = ({
           handleCloseRoute={handleCloseRoute}
         />
         
-        {/* Map Overlay Controls */}
-        <div className="absolute top-4 right-4 z-10">
-          <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-2 space-y-2">
-            {/* View Toggle */}
-            <button className="w-full p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
-              <svg className="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 01.553-.894L9 2l6 3 5.447-2.724A1 1 0 0121 3.382v10.764a1 1 0 01-.553.894L15 18l-6-3z" />
-              </svg>
-            </button>
-            
-            {/* Zoom Controls */}
-            <div className="border-t pt-2">
-              <button className="w-full p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors text-lg font-bold">
-                +
-              </button>
-              <button className="w-full p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors text-lg font-bold">
-                −
-              </button>
-            </div>
-            
-            {/* Center Map */}
-            <div className="border-t pt-2">
-              <button className="w-full p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
-                <svg className="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Route Information Panel (when route is selected) */}
+        {/* Route Details Summary - Back on map */}
         {selectedRoute && (
-          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-10">
-            <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-4 min-w-80">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-gray-900">{selectedRoute.name}</h3>
-                <button
-                  onClick={handleCloseRoute}
-                  className="text-gray-400 hover:text-gray-600 p-1"
-                >
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                  </svg>
-                </button>
-              </div>
-              
-              <div className="grid grid-cols-3 gap-4 text-sm">
+          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10">
+            <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-4">
+              <div className="flex items-center space-x-4">
                 <div className="text-center">
-                  <p className="text-gray-500">Stops</p>
-                  <p className="font-semibold text-gray-900">{selectedRoute.addresses?.length || 0}</p>
+                  <p className="text-xs text-gray-500 uppercase tracking-wide">Stops</p>
+                  <p className="text-xl font-bold text-blue-600">
+                    {selectedRoute.route_data?.addresses?.length || 0}
+                  </p>
                 </div>
+                <div className="w-px h-8 bg-gray-200"></div>
                 <div className="text-center">
-                  <p className="text-gray-500">Distance</p>
-                  <p className="font-semibold text-gray-900">~12.5 mi</p>
+                  <p className="text-xs text-gray-500 uppercase tracking-wide">Duration</p>
+                  <p className="text-xl font-bold text-green-600">
+                    {routeDetails[selectedRoute.id]?.duration || 'Calculating...'}
+                  </p>
                 </div>
+                <div className="w-px h-8 bg-gray-200"></div>
                 <div className="text-center">
-                  <p className="text-gray-500">Duration</p>
-                  <p className="font-semibold text-gray-900">~25 min</p>
+                  <p className="text-xs text-gray-500 uppercase tracking-wide">Distance</p>
+                  <p className="text-xl font-bold text-purple-600">
+                    {routeDetails[selectedRoute.id]?.distance || 'Calculating...'}
+                  </p>
                 </div>
-              </div>
-              
-              <div className="mt-3 flex space-x-2">
-                <button className="flex-1 bg-blue-600 text-white text-sm font-medium py-2 px-3 rounded-lg hover:bg-blue-700 transition-colors">
-                  Start Route
-                </button>
-                <button className="flex-1 bg-gray-100 text-gray-700 text-sm font-medium py-2 px-3 rounded-lg hover:bg-gray-200 transition-colors">
-                  Edit Route
-                </button>
               </div>
             </div>
           </div>
         )}
-
-        {/* Quick Stats Overlay */}
-        <div className="absolute top-4 left-96 z-10">
-          <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-4">
-            <div className="flex items-center space-x-4">
-              <div className="text-center">
-                <p className="text-xs text-gray-500 uppercase tracking-wide">Total Routes</p>
-                <p className="text-xl font-bold text-gray-900">{routes.length}</p>
-              </div>
-              <div className="w-px h-8 bg-gray-200"></div>
-              <div className="text-center">
-                <p className="text-xs text-gray-500 uppercase tracking-wide">Active Today</p>
-                <p className="text-xl font-bold text-green-600">{routes.length}</p>
-              </div>
-              <div className="w-px h-8 bg-gray-200"></div>
-              <div className="text-center">
-                <p className="text-xs text-gray-500 uppercase tracking-wide">Total Stops</p>
-                <p className="text-xl font-bold text-blue-600">
-                  {routes.reduce((total, route) => total + (route.addresses?.length || 0), 0)}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
+
+      {/* Enhanced Route Detail Panel - Under Map */}
+      {selectedRoute && (
+        <RouteDetailPanel
+          route={selectedRoute}
+          routeDetails={routeDetails[selectedRoute?.id]}
+          onClose={handleCloseRoute}
+          onEdit={() => handleEditRoute(selectedRoute?.id)}
+          onDelete={() => handleDeleteRoute(selectedRoute?.id)}
+          onDuplicate={() => handleDuplicateRoute(selectedRoute?.id)}
+          onStartRoute={() => handleStartRoute(selectedRoute?.id)}
+        />
+      )}
 
     </>
   );
@@ -402,8 +510,10 @@ RoutesPage.propTypes = {
   routes: PropTypes.arrayOf(
     PropTypes.shape({
       id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
-      route_name: PropTypes.string.isRequired,
-      addresses: PropTypes.arrayOf(PropTypes.string),
+      name: PropTypes.string.isRequired,
+      route_data: PropTypes.shape({
+        addresses: PropTypes.arrayOf(PropTypes.string),
+      }),
     })
   ),
   fetching: PropTypes.bool,
@@ -413,7 +523,10 @@ RoutesPage.propTypes = {
   selectedRoute: PropTypes.shape({
     id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     name: PropTypes.string,
-    addresses: PropTypes.arrayOf(PropTypes.string),
+    route_data: PropTypes.shape({
+      addresses: PropTypes.arrayOf(PropTypes.string),
+    }),
+    addresses: PropTypes.arrayOf(PropTypes.string), // For backward compatibility
   }),
   center: PropTypes.shape({
     lat: PropTypes.number.isRequired,

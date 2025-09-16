@@ -157,17 +157,8 @@ function MapSection({
   }, [selectedRoute, directions, fitMapToRoute]);
 
   return (
-    <div className="relative flex-1 flex flex-col w-full h-full">
-      {/* Top Section (Map) */}
-      <div
-        ref={mapDivRef}
-        className={`
-          w-full
-          transition-all 
-          duration-300
-          ${selectedRoute ? "h-1/2" : "h-full"}
-        `}
-      >
+    <div className="relative w-full h-full">
+      <div ref={mapDivRef} className="w-full h-full">
         <GoogleMap
           onLoad={(map) => {
             mapInstanceRef.current = map;
@@ -188,51 +179,6 @@ function MapSection({
         >
           {directions && <DirectionsRenderer directions={directions} />}
         </GoogleMap>
-      </div>
-
-      {/* Bottom Section (Route Details) */}
-      <div
-        className={`
-          overflow-hidden
-          bg-white
-          shadow-lg 
-          transition-all 
-          duration-300
-          ${selectedRoute ? "h-1/2" : "h-0"}
-        `}
-      >
-        {selectedRoute && (
-          <div className="p-4 h-full overflow-y-auto">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-xl font-bold">{selectedRoute.route_name}</h2>
-              <button
-                onClick={handleCloseRoute}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                ✕
-              </button>
-            </div>
-            <h3>Number of Stops: {selectedRoute.addresses.length}</h3>
-
-            <hr className="my-2" />
-            <div className="mt-4">
-              <h3 className="text-md font-semibold mb-2">Route Addresses:</h3>
-              <ul className="list-decimal list-inside space-y-1 text-sm text-gray-700">
-                {selectedRoute.addresses.map((address, idx) => (
-                  <li key={idx}>{address}</li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Button to generate PDF */}
-            <button
-              onClick={handleGeneratePDF}
-              className="mt-4 bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600"
-            >
-              Generate PDF
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );

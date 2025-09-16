@@ -94,6 +94,13 @@ const AddressAutocomplete = ({
               });
 
               const address = place.formattedAddress || place.displayName;
+              
+              // Update the input value immediately
+              const input = placeAutocomplete.querySelector('input');
+              if (input) {
+                input.value = address;
+              }
+              
               onChange(address);
             } catch (error) {
               console.error('Error handling place selection:', error);

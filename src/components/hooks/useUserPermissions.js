@@ -1,72 +1,60 @@
 import { useMemo } from "react";
-import useUserOnboarding from "./useUserOnboarding";
+import { useAuth0 } from "@auth0/auth0-react";
 
 /**
- * Centralized hook for role-based permissions and access control
- * Provides consistent permission checking across the application
+ * Simplified permissions hook without database dependencies
+ * For now, all authenticated users have full access
  */
 export default function useUserPermissions() {
-  const { userRecord } = useUserOnboarding();
+  const { user, isAuthenticated } = useAuth0();
   
-  const userRole = userRecord?.role;
-  const isAdmin = userRole === 'admin';
-  const isManager = userRole === 'manager';
-  const isUser = userRole === 'user';
+  // For simplified flow, all authenticated users are treated as admins
+  const userRole = isAuthenticated ? 'admin' : null;
+  const isAdmin = isAuthenticated;
+  const isUser = isAuthenticated;
 
   // Feature permissions based on role
   const permissions = useMemo(() => ({
     // Route permissions
     routes: {
-      viewAll: isAdmin || isManager, // Can view all org routes
-      viewOwn: true, // All users can view their own routes
-      create: true, // All users can create routes
-      edit: isAdmin || isManager, // Can edit any route in org
-      editOwn: true, // All users can edit their own routes
-      delete: isAdmin || isManager, // Can delete any route in org
-      deleteOwn: isUser, // Users can only delete their own routes
-      assign: isAdmin || isManager, // Can assign routes to drivers
-      bulkOperations: isAdmin || isManager, // Bulk route operations
+      viewAll: isAdmin, // Only admins can view all org routes
+      viewAssigned: isUser, // Users can view their assigned routes
+      create: isAdmin, // Only admins can create routes
+      edit: isAdmin, // Only admins can edit routes
+      delete: isAdmin, // Only admins can delete routes
+      assign: isAdmin, // Only admins can assign routes to users
+      updateProgress: isUser, // Users can update progress on assigned routes
+      bulkOperations: isAdmin, // Bulk route operations
     },
 
     // Client permissions
     clients: {
-      viewAll: isAdmin || isManager, // Can view all org clients
-      viewOwn: true, // All users can view their own clients
-      create: true, // All users can create clients
-      edit: isAdmin || isManager, // Can edit any client in org
-      editOwn: true, // All users can edit their own clients
-      delete: isAdmin || isManager, // Can delete any client in org
-      deleteOwn: isUser, // Users can only delete their own clients
-      bulkOperations: isAdmin || isManager, // Bulk client operations
+      viewAll: isAdmin, // Admins can view all org clients
+      viewAssigned: isUser, // Users can view clients on their assigned routes
+      create: isAdmin, // Only admins can create clients
+      edit: isAdmin, // Only admins can edit client details
+      updateStatus: isUser, // Users can update client status during route execution
+      delete: isAdmin, // Only admins can delete clients
+      bulkOperations: isAdmin, // Bulk client operations
     },
 
-    // Driver permissions
-    drivers: {
-      view: isAdmin || isManager, // Only admin/managers can see drivers
-      create: isAdmin || isManager,
-      edit: isAdmin || isManager,
-      delete: isAdmin,
-      assign: isAdmin || isManager,
-      bulkOperations: isAdmin,
-    },
-
-    // Assignment permissions
+    // Assignment permissions (routes assigned to users)
     assignments: {
-      viewAll: isAdmin || isManager, // Can view all assignments
-      viewOwn: isUser, // Users can only see their own assignments
-      create: isAdmin || isManager,
-      edit: isAdmin || isManager,
-      delete: isAdmin,
-      manage: isAdmin || isManager,
+      viewAll: isAdmin, // Admins can view all assignments
+      viewOwn: isUser, // Users can see their own assignments
+      create: isAdmin, // Only admins can create assignments
+      edit: isAdmin, // Only admins can modify assignments
+      delete: isAdmin, // Only admins can delete assignments
+      manage: isAdmin, // Only admins can manage assignments
     },
 
     // Analytics permissions
     analytics: {
-      viewOrgWide: isAdmin || isManager, // Organization-wide analytics
-      viewOwn: isUser, // Users can see their own analytics
-      exportData: isAdmin || isManager,
-      viewReports: isAdmin || isManager,
-      createReports: isAdmin,
+      viewOrgWide: isAdmin, // Only admins see organization-wide analytics
+      viewOwn: isUser, // Users can see their own performance analytics
+      exportData: isAdmin, // Only admins can export data
+      viewReports: isAdmin, // Only admins can view reports
+      createReports: isAdmin, // Only admins can create reports
     },
 
     // Organization management
@@ -74,7 +62,7 @@ export default function useUserPermissions() {
       view: isAdmin, // Only admins can view org settings
       edit: isAdmin,
       manageUsers: isAdmin,
-      viewUsers: isAdmin || isManager,
+      viewUsers: isAdmin,
       manageBilling: isAdmin,
       viewAuditLogs: isAdmin,
     },
@@ -91,53 +79,71 @@ export default function useUserPermissions() {
     // Notification permissions
     notifications: {
       viewOwn: true, // All users can view their notifications
-      viewAll: isAdmin || isManager, // Managers can view team notifications
-      send: isAdmin || isManager, // Can send notifications to others
-      manage: isAdmin, // Can manage notification settings
+      viewAll: isAdmin, // Only admins can view all notifications
+      send: isAdmin, // Only admins can send notifications to others
+      manage: isAdmin, // Only admins can manage notification settings
     },
 
     // General UI permissions
     ui: {
-      showAdvancedFeatures: isAdmin || isManager,
-      showBulkActions: isAdmin || isManager,
+      showAdvancedFeatures: isAdmin,
+      showBulkActions: isAdmin,
       showAdminMenu: isAdmin,
-      showManagerFeatures: isAdmin || isManager,
       showUserOnlyFeatures: isUser,
     }
-  }), [userRole, isAdmin, isManager, isUser]);
+  }), [userRole, isAdmin, isUser]);
 
   // Helper functions for common permission checks
   const can = useMemo(() => ({
     // Route helpers
     viewRoute: (route) => {
       if (permissions.routes.viewAll) return true;
-      return route?.user_id === userRecord?.auth0_id;
+      // Users can view routes assigned to them
+      return route?.assigned_user_id === user?.sub;
     },
     
     editRoute: (route) => {
-      if (permissions.routes.edit) return true;
-      return route?.user_id === userRecord?.auth0_id && permissions.routes.editOwn;
+      // Only admins can edit routes
+      return permissions.routes.edit;
     },
     
     deleteRoute: (route) => {
-      if (permissions.routes.delete) return true;
-      return route?.user_id === userRecord?.auth0_id && permissions.routes.deleteOwn;
+      // Only admins can delete routes
+      return permissions.routes.delete;
+    },
+
+    updateRouteProgress: (route) => {
+      // Users can update progress on routes assigned to them
+      return route?.assigned_user_id === user?.sub && permissions.routes.updateProgress;
     },
 
     // Client helpers
     viewClient: (client) => {
       if (permissions.clients.viewAll) return true;
-      return client?.created_by_user_id === userRecord?.auth0_id;
+      // Users can view clients on their assigned routes (this would need route context)
+      return false; // Will be enhanced when we add route context
     },
     
     editClient: (client) => {
-      if (permissions.clients.edit) return true;
-      return client?.created_by_user_id === userRecord?.auth0_id && permissions.clients.editOwn;
+      // Only admins can edit client details
+      return permissions.clients.edit;
+    },
+    
+    updateClientStatus: (client) => {
+      // Users can update client status during route execution
+      return permissions.clients.updateStatus;
     },
     
     deleteClient: (client) => {
-      if (permissions.clients.delete) return true;
-      return client?.created_by_user_id === userRecord?.auth0_id && permissions.clients.deleteOwn;
+      // Only admins can delete clients
+      return permissions.clients.delete;
+    },
+
+    // Assignment helpers
+    viewAssignment: (assignment) => {
+      if (permissions.assignments.viewAll) return true;
+      // Users can view their own assignments
+      return assignment?.assigned_user_id === user?.sub;
     },
 
     // Page access helpers
@@ -148,7 +154,7 @@ export default function useUserPermissions() {
         case 'clients':
           return true; // All users can access clients page
         case 'drivers':
-          return permissions.drivers.view;
+          return permissions.users.view; // Only admins can manage drivers (users with 'user' role)
         case 'assignments':
           return permissions.assignments.viewAll || permissions.assignments.viewOwn;
         case 'analytics':
@@ -161,58 +167,32 @@ export default function useUserPermissions() {
           return false;
       }
     }
-  }), [permissions, userRecord]);
+  }), [permissions, user]);
 
   // Data scoping helpers
   const getDataScope = useMemo(() => ({
     // Returns the appropriate filter for database queries
     routes: () => {
-      if (permissions.routes.viewAll) {
-        // Admin/Manager: return all routes in organization
-        return { organization_id: userRecord?.organization_id };
-      } else {
-        // User: return only their own routes
-        return { 
-          organization_id: userRecord?.organization_id,
-          user_id: userRecord?.auth0_id 
-        };
-      }
+      // For simplified flow, return empty filters (all routes)
+      return {};
     },
 
     clients: () => {
-      if (permissions.clients.viewAll) {
-        // Admin/Manager: return all clients in organization
-        return { organization_id: userRecord?.organization_id };
-      } else {
-        // User: return only their own clients
-        return { 
-          organization_id: userRecord?.organization_id,
-          created_by_user_id: userRecord?.auth0_id 
-        };
-      }
+      // For simplified flow, return empty filters (all clients)
+      return {};
     },
 
     assignments: () => {
-      if (permissions.assignments.viewAll) {
-        // Admin/Manager: return all assignments in organization
-        return { organization_id: userRecord?.organization_id };
-      } else {
-        // User: return only assignments for their routes
-        return { 
-          organization_id: userRecord?.organization_id,
-          // This would need a join or subquery to match user's routes
-          user_id: userRecord?.auth0_id 
-        };
-      }
+      // For simplified flow, return empty filters (all assignments)
+      return {};
     }
-  }), [permissions, userRecord]);
+  }), [permissions, user]);
 
   return {
     // User info
     userRole,
-    userRecord,
+    userRecord: user, // Use Auth0 user object directly
     isAdmin,
-    isManager,
     isUser,
     
     // Permissions object

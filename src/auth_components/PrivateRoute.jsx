@@ -1,14 +1,12 @@
 import { useAuth0 } from "@auth0/auth0-react";
 import { Navigate } from "react-router-dom";
 import propTypes from "prop-types";
-import useUserOnboarding from "../components/hooks/useUserOnboarding";
 
 const PrivateRoute = ({ children }) => {
   const { isAuthenticated, isLoading: authLoading } = useAuth0();
-  const { needsOnboarding, isLoading: onboardingLoading } = useUserOnboarding();
 
-  // Show loading while checking authentication or onboarding status
-  if (authLoading || onboardingLoading) {
+  // Show loading while checking authentication
+  if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <div className="text-center">
@@ -24,12 +22,7 @@ const PrivateRoute = ({ children }) => {
     return <Navigate to="/" />;
   }
 
-  // Authenticated but needs onboarding - redirect to onboarding
-  if (needsOnboarding) {
-    return <Navigate to="/onboarding" />;
-  }
-
-  // Authenticated and onboarded - allow access
+  // Authenticated - allow access directly to dashboard
   return children;
 };
 
